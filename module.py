@@ -10,16 +10,19 @@ def lifetimeSparseness(intersweep, sweeplength, orivals, tfvals, num_cells, stim
     N = len(orivals) * len(tfvals)
     # Loop over cells
     for cell_index in range(num_cells):
-        #get time and trial average for each stimulus condition
+        # get time and trial average for each stimulus condition
         # Loop over orientations and times
         cell_response = []
         for ori in orivals:
             for tf in tfvals:
                 tf_mask = stimulus_table['temporal_frequency'] == tf
                 ori_mask = stimulus_table['orientation'] == ori
-                trial_arr = np.array(sweep_response[tf_mask & ori_mask][str(cell_index)].tolist()) #TODO clean this up
+                trial_arr = np.array(sweep_response[tf_mask & ori_mask][str(cell_index)].tolist())
+                lens = [len(trial) for trial in trial_arr]
+                if min(lens) < max(lens): # justify trial lengths if one or more has a different length
+                    trial_arr = np.array([trial[0:min(lens)] for trial in trial_arr])
                 if not np.all(np.isfinite(trial_arr)):
-                    print("trial error: excluding data for orientation = %f degrees, temporal frequency = %f" % (ori,tf))
+                    print("trial error (inf or NaN): excluding data for orientation = %f degrees, temporal frequency = %f" % (ori,tf))
                     continue
 
                 trial_mean = trial_arr[:, trial_start:trial_end].mean()

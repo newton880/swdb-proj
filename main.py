@@ -51,7 +51,7 @@ CAM_df['path_to_exp'] = list_of_paths
 # LOOP OVER ALL EXPERIMENTS AND CALCULATE HISTOGRAM OF LIFETIME SPARSENESSES FOR EACH
 lift_spar_list = []
 for path in list_of_paths:
-
+    print path
     # extract interesting information
     meta = cn.getMetaData(path) # get meta data for experiment of interest
     proj = cn.getMaxProjection(path) # getMaxProjection returns a 512x512 array of the maximum projection of the 2P movie
@@ -117,6 +117,7 @@ for path in list_of_paths:
             cr = cr.mean(axis=0) # find average response over all trials for condition
             cr = [cr[i][int(intersweep):int(intersweep+sweeplength)] for i in range(len(cr))] # restrict to stimulus presentation times
             conditions[oi,ti] = cr
+    print "done with averaging"
 
     # compute two-way Kolmogorov-Smirnov test on blank vs. stimulus trial for each cell for each sweep to determine significance
     # find lifetime sparsenesses of signficantly responding cells
@@ -133,17 +134,20 @@ for path in list_of_paths:
         these_rois = [i for i,x in enumerate(pdvals[oi,ti][0]) if x[1]<PTHRESH/float(conditions.size)]
         sig_rois = np.union1d(sig_rois,these_rois) # find unique values in union of all significantly responding rois so far, and this condition's
 
+    print "found sig rois"
     # find lifetime sparsenesses
     lifetime_sparseness = module.lifetimeSparseness(intersweep, sweeplength, orivals, tfvals, number_cells, stimulus_table, sweep_response)
     sig_sparseness = np.asarray([lifetime_sparseness[int(i)] for i in sig_rois]) # numpy array of lifetime sparsenesses of significantly responding cells
     lift_spar_list.append(sig_sparseness)
+    print "found lifetime sparsenesses"
 
 # plot results
+print "plotting results"
 sbplts = np.zeros((4,5))
 f, axarr = plt.subplots(4, 5)
 for (x,y), data in np.ndenumerate(sbplts):
     li = np.ravel_multi_index((x,y), dims=(4,5), order='C')
     axarr[x, y].hist(lift_spar_list[li],bins=NBINS,normed=1,histtype='bar',rwidth=0.8)
-    axarr[x, y].xlabel('Lifetime Sparseness')
-    axarr[x, y].ylabel('Count')
+plt.xlabel('Lifetime Sparseness')
+plt.ylabel('Count')
 plt.show()
