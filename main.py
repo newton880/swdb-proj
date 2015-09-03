@@ -12,7 +12,7 @@ import os
 import matplotlib.pyplot as plt
 import CAM_NWB as cn
 from scipy.stats import ks_2samp
-import module
+import sparseness as sp
 
 
 # constants
@@ -49,7 +49,8 @@ CAM_df['mean speed'] = mean_speed
 CAM_df['path_to_exp'] = list_of_paths
 
 # LOOP OVER ALL EXPERIMENTS AND CALCULATE HISTOGRAM OF LIFETIME SPARSENESSES FOR EACH
-lift_spar_list = []
+life_spar_list = []
+pop_spar_list = []
 for path in list_of_paths:
     print path
     # extract interesting information
@@ -135,19 +136,29 @@ for path in list_of_paths:
         sig_rois = np.union1d(sig_rois,these_rois) # find unique values in union of all significantly responding rois so far, and this condition's
 
     print "found sig rois"
-    # find lifetime sparsenesses
-    lifetime_sparseness = module.lifetimeSparseness(intersweep, sweeplength, orivals, tfvals, number_cells, stimulus_table, sweep_response)
-    sig_sparseness = np.asarray([lifetime_sparseness[int(i)] for i in sig_rois]) # numpy array of lifetime sparsenesses of significantly responding cells
-    lift_spar_list.append(sig_sparseness)
-    print "found lifetime sparsenesses"
+    # find lifetime and population sparsenesses
+    pop, life = sp.sparseness(intersweep, sweeplength, orivals, tfvals, number_cells, stimulus_table, sweep_response)
+    sig_life_sparseness = np.asarray([life[int(i)] for i in sig_rois]) # numpy array of lifetime sparsenesses of significantly responding cells
+    life_spar_list.append(sig_life_sparseness)
+    pop_spar_list.append(np.asarray(pop))
+    print "found lifetime and population sparsenesses"
+
+
 
 # plot results
 print "plotting results"
 sbplts = np.zeros((4,5))
-f, axarr = plt.subplots(4, 5)
+
+f1, axarr1 = plt.subplots(4, 5)
 for (x,y), data in np.ndenumerate(sbplts):
     li = np.ravel_multi_index((x,y), dims=(4,5), order='C')
-    axarr[x, y].hist(lift_spar_list[li],bins=NBINS,normed=1,histtype='bar',rwidth=0.8)
-plt.xlabel('Lifetime Sparseness')
-plt.ylabel('Count')
+    axarr1[x, y].hist(life_spar_list[li],bins=NBINS,normed=1,histtype='bar',rwidth=0.8)
+
+f2, axarr2 = plt.subplots(4, 5)
+for (x,y), data in np.ndenumerate(sbplts):
+    li = np.ravel_multi_index((x,y), dims=(4,5), order='C')
+    axarr2[x, y].hist(pop_spar_list[li],bins=NBINS,normed=1,histtype='bar',rwidth=0.8)
+
 plt.show()
+
+
