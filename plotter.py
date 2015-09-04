@@ -35,7 +35,6 @@ for li, ax in enumerate(axarr.flatten()):
     #ax.vlines(median_lfts[li]), 0, lift_spar_list[li].max(), color='r', lw=1.5, linestyle='dashed')
 plt.xlabel('Lifetime Sparseness')
 plt.ylabel('Count')
-plt.show()
 
 # plot population sparseness distribution for each experiment
 figure, axarr = plt.subplots(nrows=5, ncols=4, figsize=(9,9))
@@ -49,4 +48,5 @@ for li, ax in enumerate(axarr.flatten()):
     #ax.vlines(median_lfts[li]), 0, lift_spar_list[li].max(), color='r', lw=1.5, linestyle='dashed')
 plt.xlabel('Population Sparseness')
 plt.ylabel('Count')
+
 plt.show()
