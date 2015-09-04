@@ -8,50 +8,27 @@
 # library imports
 import numpy as np
 import pandas as pd
-import os
 import matplotlib.pyplot as plt
 import CAM_NWB as cn
 from scipy.stats import ks_2samp
 import sparseness as sp
+import initialize as init
 
 
 # constants
-MXROWS = 10 # maximum number of columns to display for pandas
-MXCOLS = 6 # maximum number of rows to display for pandas
-EXPID = str(479182359) # experiment ID number
 CAMDIR = r'/Volumes/Brain2015/CAM/'
-NTRIALS = 15 # number of trials per sweep
 PTHRESH = 0.05 # p-value cutoff above which results are not significant
-DTHRESH = 0.01 # D-statistic for K-S test below which results are not significant
 NBINS = 20 # number of bins for histogram plot
 DF_THRESH = 15 # percent threshold (dF/F) for cutting off non-responsive cells
 
 
 # get experiment data and path to experiments
-list_of_dirs = os.walk(CAMDIR).next()[1]
-list_of_paths = []
-for i in list_of_dirs:
-    nwb_path = CAMDIR + i + '/' + i + '.nwb'
-    list_of_paths.append(nwb_path)
-
-CAM_df = pd.DataFrame(index=range(len(list_of_paths),),columns=cn.getMetaData(list_of_paths[0]))
-row_counter = 0
-for path in list_of_paths:
-    CAM_df.loc[row_counter] = pd.Series(cn.getMetaData(path))
-    row_counter += 1
-
-# add a metric of running speed to that data frame
-mean_speed = []
-for path in list_of_paths:
-    run_data = cn.getRunningSpeed(path)
-    mean_speed.append(np.nanmean(run_data[0]))
-CAM_df['mean speed'] = mean_speed
-CAM_df['path_to_exp'] = list_of_paths
+path_list, CAM_df = init.makeDF(CAMDIR)
 
 # LOOP OVER ALL EXPERIMENTS AND CALCULATE HISTOGRAM OF LIFETIME SPARSENESSES FOR EACH
 life_spar_list = []
 pop_spar_list = []
-for path in list_of_paths:
+for path in path_list:
     print path
     # extract interesting information
     meta = cn.getMetaData(path) # get meta data for experiment of interest
@@ -82,18 +59,8 @@ for path in list_of_paths:
     sweeplength = stimulus_table['end'][1] - stimulus_table['start'][1]
     intersweep = stimulus_table['start'][2] - stimulus_table['end'][1]
 
-    # create an empty data frame with columns for each ROI and index (rows) for each stimulus sweep
-    sweep_response = pd.DataFrame(index=stimulus_table.index.values, columns=np.array(range(number_cells)).astype(str))
-
-    # populate data frame with dF/F trace of each ROI in response to each grating (restricted to stimulus presentation)
-    sorted_table = stimulus_table.sort(['orientation','temporal_frequency'])
-    sorted_table = sorted_table.reset_index(drop=True)
-    for index, row in sorted_table.iterrows():
-        start = row['start'] - intersweep  # UNCOMMENT TO RETRIEVE FULL TRACE (INCLUDING INTERSWEEP)
-        end = row['start'] + sweeplength + intersweep
-        for nc in range(number_cells):
-            temp = celltraces[nc,start:end]
-            sweep_response[str(nc)][index] = 100*((temp/np.mean(temp[:intersweep]))-1) # locally defined dF/F
+    # create data frame with dF/F trace of each ROI in response to each grating
+    sweep_response = init.getResponses(stimulus_table, celltraces, number_cells, intersweep, sweeplength)
 
     # find blank stimulus presentations
     blank = stimulus_table[stimulus_table['blank_sweep']==1]
@@ -103,13 +70,13 @@ for path in list_of_paths:
     # least one condition (see Rust & DiCarlo, 2012), and whose dF/F is > DF_THRESH.
 
     # begin by averaging data for blank stimulus trials
-    blanks = sweep_response[sorted_table['blank_sweep']==1].values # blank stimulus trials
+    blanks = sweep_response[stimulus_table['blank_sweep']==1].values # blank stimulus trials
     blanks = blanks.mean(axis=0) # get average response over all trials
 
     # now average cell response data for stimulus trials
     conditions = np.ndarray(shape=(len(orivals),len(tfvals)), dtype=list, order='C') # numpy array to store all cell responses for each condition
     for oi, ori in enumerate(orivals): # loop over orientations
-        df = sorted_table[sorted_table['orientation']==ori]
+        df = stimulus_table[stimulus_table['orientation']==ori]
         for ti, tf in enumerate(tfvals): # loop over temporal frequencies, for a given orientation
             data = df[df['temporal_frequency']==tf] # data block corresponding to given orientation and temporal freq
             start = data.index.values[0]
