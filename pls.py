@@ -15,8 +15,8 @@ def pls(stimulus_table, sweep_response, number_cells, intersweep, sweeplength):
     # B: brain scores
 
     # calculate constants
-    t1 = stimulus_table['temporal_frequency'].unique()[0]
-    o1 = stimulus_table['orientation'].unique()[0]
+    t1 = stimulus_table['temporal_frequency'].dropna().unique()[0]
+    o1 = stimulus_table['orientation'].dropna().unique()[0]
     N = len(stimulus_table[(stimulus_table['temporal_frequency']==t1)&(stimulus_table['orientation']==o1)]) # number of trials per condition
     orivals = stimulus_table.orientation.dropna().unique() # find unique orientation values
     tfvals = stimulus_table.temporal_frequency.dropna().unique() # find unique temporal frequency values
@@ -43,8 +43,9 @@ def pls(stimulus_table, sweep_response, number_cells, intersweep, sweeplength):
                     trial_arr = np.array([trial[0:min(lens)] for trial in trial_arr])
                 if not np.all(np.isfinite(trial_arr)):
                     print("trial error (inf or NaN): excluding data for orientation = %f degrees, temporal frequency = %f" % (ori,tf))
+                    li += 1
                     continue
-                M[li*N:(li+1)*N, cell_index*Tf:(cell_index+1)*Tf] = trial_arr[:, intersweep:intersweep+Tf] #
+                M[li*N:(li+1)*N, cell_index*Tf:(cell_index+1)*Tf] = trial_arr[:, intersweep:intersweep+Tf]
                 T[li, cell_index*Tf:(cell_index+1)*Tf] = trial_arr[:, intersweep:intersweep+Tf].mean() # take mean over trials
                 li += 1 # update linear index across conditions
         this_blank = np.array(blanks[str(cell_index)].tolist())
@@ -109,8 +110,40 @@ def permuteTest(U, S, M, N, orivals, tfvals, nperms):
     return pvals
 
 
-def bootstrap(niters, U):
+def bootstrap(niters, N, M, U, S, orivals, tfvals):
 
     # permute rows of data matrix M to test significance of effects represeted in LVs
-    return 0
+    K = len(orivals)*len(tfvals)+1 # number of experimental conditions (plus one blank)
+    UMAT = np.zeros((U.shape[0], niters, len(S))) # 3-d data matrix, where each "depth" layer corresponds to a different LV
+    for i in range(niters):
+        Mb = M
+        for k in range(K):
+            idx = np.random.randint(k*N, high=(k+1)*N, size=(1, N)) # randomly choose rows, with replacement
+            Mb[k*N:(k+1)*N, :] = Mb[idx, :]
 
+        ncols = M.shape[1]
+        Tb = np.zeros((K, ncols)) # trial-averaged permuted data matrix
+        li = 0 # linear index over conditions
+        for oi in range(len(orivals)):
+            for ti in range(len(tfvals)):
+                Tb[li, :] = Mb[li*N:(li+1)*N, :].mean(axis=0)
+                li += 1 # update linear index
+        Tb[K-1,:] = Mb[(li+1)*N:, :].mean(axis=0)
+
+        # perform singular value decomposition
+        Tb = np.matrix(Tb)
+        v = np.matrix(np.ones((1,K)))
+        vT = np.transpose(v)
+        Tb = Tb-np.dot(vT, np.dot(v, Tb)/float(K))
+        Ub,_,_ = np.linalg.svd(np.transpose(Tb),full_matrices=False)
+        UMAT[:, i, :] = Ub
+
+    # get standard errors and perform thresholding
+    ste = np.reshape(np.std(UMAT,axis=1), U.shape)
+    ste = ste/float(niters)
+    z = np.absolute(U)/ste # threshold to preserve only those voxels whose ratio to their standard error is > 2
+    idx = np.where(z > 2)
+    Usig = np.zeros(U.shape)
+    Usig[idx] = U[idx]
+
+    return Usig

@@ -20,6 +20,7 @@ PTHRESH = 0.05 # p-value cutoff above which results are not significant
 NBINS = 20 # number of bins for histogram plot
 DF_THRESH = 15 # percent threshold (dF/F) for cutting off non-responsive cells
 NPERMS = 100 # number of permutations to use for permutation test of significance for LVs
+NBOOTS = 100 # number of iterations to perform for bootsrapping procedure for salience stabilities
 
 
 # get experiment data and path to experiments
@@ -30,8 +31,9 @@ life_spar_list = []
 pop_spar_list = []
 meta_list = []
 pval_list = []
+sal_list = []
 for path in path_list:
-    print path
+
     # extract interesting information
     meta = cn.getMetaData(path) # get meta data for experiment of interest
     proj = cn.getMaxProjection(path) # getMaxProjection returns a 512x512 array of the maximum projection of the 2P movie
@@ -97,12 +99,19 @@ for path in path_list:
     pvals = pls.permuteTest(U, S, M, N, orivals, tfvals, NPERMS)
     pval_list.append(pvals)
 
+    # find significant cell saliences, and save them
+    Usig = pls.bootstrap(NBOOTS, N, M, U, S, orivals, tfvals)
+    U1 = Usig[:,0] # cell saliences of first principal component
+    saliences = np.zeros((number_cells, 1))
+    for cell_index in range(number_cells):
+        x = U1[cell_index*sweeplength:(cell_index+1)*sweeplength]
+        saliences[cell_index] = max(x.min(), x.max(), key=abs) # take maximum of saliences
+    sal_list.append(saliences) # append results
+
 # Save the variables in a pickle file. Plot data in plot_sparseness.py
-names_dict = dict(lift_spar_list=life_spar_list, pop_spar_list=pop_spar_list, meta_list=meta_list, pval_list=pval_list)
+names_dict = dict(lift_spar_list=life_spar_list, pop_spar_list=pop_spar_list, meta_list=meta_list, pval_list=pval_list, sal_list=sal_list)
 pkl_file = open('names_dict','wb')
 cPickle.dump(names_dict, pkl_file)
 pkl_file.close()
-
-print [p[0:4] for p in pval_list]
 
 
